@@ -1,0 +1,47 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy # Download all the packages listed in go.sum
+    - go install github.com/Songmu/gocredits/cmd/gocredits@latest
+    - gocredits -w .
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/abicky/akv/cmd.revision={{.ShortCommit}}
+archives:
+  - # Exclude the version to download the latest version via https://github.com/abicky/akv/releases/latest/download/$archive_name
+    name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - LICENSE
+      - README.md
+      - CREDITS
+    wrap_in_directory: true
+brews:
+  - repository:
+      owner: abicky
+      name: homebrew-tools
+    homepage: "https://github.com/abicky/akv"
+    description: "A CLI tool for injecting Azure Key Vault secrets"
+    directory: Formula
+    install: |
+      bin.install "akv"
+      generate_completions_from_executable(bin/"akv", "completion")
+    test: |
+      system "#{bin}/akv --version"
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  version_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
