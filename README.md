@@ -100,6 +100,25 @@ Flags:
   -h, --help   help for inject
 ```
 
+### exec subcommand
+
+```console
+$ akv exec --help
+This command executes a command with Azure Key Vault secrets injected into environment
+variables whose value is a secret reference in the format "akv://<vault-name>/<secret-name>"
+
+Usage:
+  akv exec [flags] -- COMMAND [args...]
+
+Examples:
+  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE-*.h'
+  $ env PASSWORD=akv://example/password akv exec -- printenv PASSWORD
+  C@6LWQnuKDjQYHNE-*.h
+
+Flags:
+  -h, --help   help for exec
+```
+
 ## Author
 
 Takeshi Arabiki ([@abicky](https://github.com/abicky))
