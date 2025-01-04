@@ -16,9 +16,9 @@ var injectCmd = &cobra.Command{
 	Long: `This command injects Azure Key Vault secrets into input data
 with secret references in the format "akv://<vault-name>/<secret-name>"`,
 	Args: cobra.NoArgs,
-	Example: `  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE-*.h'
+	Example: `  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE'
   $ echo 'password: akv://example/password' | akv inject
-  password: C@6LWQnuKDjQYHNE-*.h
+  password: C@6LWQnuKDjQYHNE
   $ cat secret.yaml
   apiVersion: v1
   kind: Secret
@@ -26,13 +26,13 @@ with secret references in the format "akv://<vault-name>/<secret-name>"`,
     name: password
   stringData:
     password: akv://example/password
-  $ akv inject <secret.yaml
+  $ akv inject < secret.yaml
   apiVersion: v1
   kind: Secret
   metadata:
     name: password
   stringData:
-    password: C@6LWQnuKDjQYHNE-*.h`,
+    password: C@6LWQnuKDjQYHNE`,
 	RunE: runInject,
 }
 

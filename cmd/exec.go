@@ -17,9 +17,9 @@ var execCmd = &cobra.Command{
 	Long: `This command executes a command with Azure Key Vault secrets injected into environment
 variables whose value is a secret reference in the format "akv://<vault-name>/<secret-name>"`,
 	Args: cobra.MinimumNArgs(1),
-	Example: `  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE-*.h'
+	Example: `  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE'
   $ env PASSWORD=akv://example/password akv exec -- printenv PASSWORD
-  C@6LWQnuKDjQYHNE-*.h`,
+  C@6LWQnuKDjQYHNE`,
 	RunE: runExec,
 }
 

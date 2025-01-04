@@ -6,9 +6,9 @@
 For example, `inject` subcommand injects secrets into input data as follows:
 
 ```console
-$ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE-*.h'
+$ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE'
 $ echo 'password: akv://example/password' | akv inject
-password: C@6LWQnuKDjQYHNE-*.h
+password: C@6LWQnuKDjQYHNE
 ```
 
 As you can see, `akv://example/password` in the input, which is the secret reference in the format `akv://<vault-name>/<secret-name>`, has been replaced with the secret.
@@ -59,7 +59,7 @@ make install
 The `completion` subcommand generates an autocompletion script. For example, you can generate the autocompletion script for zsh as follows:
 
 ```sh
-akv completion zsh >/usr/local/share/zsh/site-functions/_akv
+akv completion zsh > /usr/local/share/zsh/site-functions/_akv
 ```
 
 If you install using Homebrew, Homebrew will generate autocompletion scripts.
@@ -78,9 +78,9 @@ Usage:
   akv inject [flags]
 
 Examples:
-  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE-*.h'
+  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE'
   $ echo 'password: akv://example/password' | akv inject
-  password: C@6LWQnuKDjQYHNE-*.h
+  password: C@6LWQnuKDjQYHNE
   $ cat secret.yaml
   apiVersion: v1
   kind: Secret
@@ -88,13 +88,13 @@ Examples:
     name: password
   stringData:
     password: akv://example/password
-  $ akv inject <secret.yaml
+  $ akv inject < secret.yaml
   apiVersion: v1
   kind: Secret
   metadata:
     name: password
   stringData:
-    password: C@6LWQnuKDjQYHNE-*.h
+    password: C@6LWQnuKDjQYHNE
 
 Flags:
   -h, --help   help for inject
@@ -111,9 +111,9 @@ Usage:
   akv exec [flags] -- COMMAND [args...]
 
 Examples:
-  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE-*.h'
+  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE'
   $ env PASSWORD=akv://example/password akv exec -- printenv PASSWORD
-  C@6LWQnuKDjQYHNE-*.h
+  C@6LWQnuKDjQYHNE
 
 Flags:
   -h, --help   help for exec
