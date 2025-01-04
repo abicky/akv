@@ -24,6 +24,8 @@ func TestInject(t *testing.T) {
 		input     string
 		vaultName string
 		secrets   []secret
+		escape    bool
+		quote     bool
 		want      string
 		clientErr error
 		secretErr error
@@ -38,6 +40,8 @@ func TestInject(t *testing.T) {
 					value:     "foo",
 				},
 			},
+			escape:    false,
+			quote:     false,
 			want:      "foo",
 			clientErr: nil,
 			secretErr: nil,
@@ -69,6 +73,8 @@ secret3:akv://vaultname3/secret-name3
 					value:     "qux",
 				},
 			},
+			escape: false,
+			quote:  false,
 			want: `secret1: foo, secret2: bar
 secret3:baz
 "secret4": "qux"`,
@@ -76,9 +82,43 @@ secret3:baz
 			secretErr: nil,
 		},
 		{
+			name:  "Multiline secret with quote true",
+			input: `secret: akv://vaultname/secret-name`,
+			secrets: []secret{
+				{
+					vaultName: "vaultname",
+					name:      "secret-name",
+					value:     "multiline\nsecret with \"quotes\"",
+				},
+			},
+			escape:    false,
+			quote:     true,
+			want:      `secret: "multiline\nsecret with \"quotes\""`,
+			clientErr: nil,
+			secretErr: nil,
+		},
+		{
+			name:  "Multiline secret with escape true",
+			input: `{"secret": "akv://vaultname/secret-name"}`,
+			secrets: []secret{
+				{
+					vaultName: "vaultname",
+					name:      "secret-name",
+					value:     "multiline\nsecret with \"quotes\"",
+				},
+			},
+			escape:    true,
+			quote:     false,
+			want:      `{"secret": "multiline\nsecret with \"quotes\""}`,
+			clientErr: nil,
+			secretErr: nil,
+		},
+		{
 			name:      "Client error",
 			input:     "akv://vaultname/secret-name",
 			secrets:   []secret{},
+			escape:    false,
+			quote:     false,
 			want:      "",
 			clientErr: errors.New("error"),
 			secretErr: nil,
@@ -91,6 +131,8 @@ secret3:baz
 					vaultName: "vaultname",
 				},
 			},
+			escape:    false,
+			quote:     false,
 			want:      "",
 			clientErr: nil,
 			secretErr: errors.New("error"),
@@ -143,7 +185,7 @@ secret3:baz
 			}).AnyTimes()
 
 			var sb strings.Builder
-			err = i.Inject(ctx, strings.NewReader(tt.input), &sb)
+			err = i.Inject(ctx, strings.NewReader(tt.input), &sb, tt.escape, tt.quote)
 			if tt.clientErr == nil && tt.secretErr == nil {
 				if err != nil {
 					t.Errorf("err = %#v; want nil", err)

@@ -41,7 +41,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 		kv := strings.SplitN(e, "=", 2)
 
 		var sb strings.Builder
-		if err := i.Inject(cmd.Context(), strings.NewReader(kv[1]), &sb); err != nil {
+		if err := i.Inject(cmd.Context(), strings.NewReader(kv[1]), &sb, false, false); err != nil {
 			return err
 		}
 		env[idx] = kv[0] + "=" + sb.String()

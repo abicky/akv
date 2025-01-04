@@ -81,6 +81,11 @@ Examples:
   $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE'
   $ echo 'password: akv://example/password' | akv inject
   password: C@6LWQnuKDjQYHNE
+  $ az keyvault secret set --vault-name example --name multiline-secret --file <(echo -n "Hello\nworld")
+  $ echo 'secret: akv://example/multiline-secret' | akv inject --quote
+  secret: "Hello\nworld"
+  $ echo '{"secret": "akv://example/multiline-secret"}' | akv inject --escape
+  {"secret": "Hello\nworld"}
   $ cat secret.yaml
   apiVersion: v1
   kind: Secret
@@ -88,16 +93,20 @@ Examples:
     name: password
   stringData:
     password: akv://example/password
-  $ akv inject < secret.yaml
+    secret: akv://example/multiline-secret
+  $ akv inject --quote < secret.yaml
   apiVersion: v1
   kind: Secret
   metadata:
     name: password
   stringData:
-    password: C@6LWQnuKDjQYHNE
+    password: "C@6LWQnuKDjQYHNE"
+    secret: "Hello\u000aworld"
 
 Flags:
-  -h, --help   help for inject
+      --escape   Escape special characters in secrets
+  -h, --help     help for inject
+      --quote    Escape and enclose each secret in double quotes
 ```
 
 ### exec subcommand

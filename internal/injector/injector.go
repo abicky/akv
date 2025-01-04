@@ -37,7 +37,7 @@ func NewInjector(mode int, factory ClientFactory) (*Injector, error) {
 	}, nil
 }
 
-func (i *Injector) Inject(ctx context.Context, input io.Reader, output io.Writer) error {
+func (i *Injector) Inject(ctx context.Context, input io.Reader, output io.Writer, escape, quote bool) error {
 	scanner := bufio.NewScanner(input)
 	scanner.Split(scanLinesWithNewlines)
 	for scanner.Scan() {
@@ -60,7 +60,15 @@ func (i *Injector) Inject(ctx context.Context, input io.Reader, output io.Writer
 				err = fmt.Errorf("failed to get secret: %w", e)
 				return ""
 			}
-			return *resp.Value
+
+			value := *resp.Value
+			if quote || escape {
+				value = fmt.Sprintf("%q", value)
+			}
+			if escape {
+				value = value[1 : len(value)-1]
+			}
+			return value
 		})
 		if err != nil {
 			return err

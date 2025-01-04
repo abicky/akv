@@ -19,6 +19,11 @@ with secret references in the format "akv://<vault-name>/<secret-name>"`,
 	Example: `  $ az keyvault secret set --vault-name example --name password --value 'C@6LWQnuKDjQYHNE'
   $ echo 'password: akv://example/password' | akv inject
   password: C@6LWQnuKDjQYHNE
+  $ az keyvault secret set --vault-name example --name multiline-secret --file <(echo -n "Hello\nworld")
+  $ echo 'secret: akv://example/multiline-secret' | akv inject --quote
+  secret: "Hello\nworld"
+  $ echo '{"secret": "akv://example/multiline-secret"}' | akv inject --escape
+  {"secret": "Hello\nworld"}
   $ cat secret.yaml
   apiVersion: v1
   kind: Secret
@@ -26,18 +31,24 @@ with secret references in the format "akv://<vault-name>/<secret-name>"`,
     name: password
   stringData:
     password: akv://example/password
-  $ akv inject < secret.yaml
+    secret: akv://example/multiline-secret
+  $ akv inject --quote < secret.yaml
   apiVersion: v1
   kind: Secret
   metadata:
     name: password
   stringData:
-    password: C@6LWQnuKDjQYHNE`,
+    password: "C@6LWQnuKDjQYHNE"
+    secret: "Hello\u000aworld"`,
 	RunE: runInject,
 }
 
 func init() {
 	rootCmd.AddCommand(injectCmd)
+
+	injectCmd.Flags().Bool("escape", false, "Escape special characters in secrets")
+	injectCmd.Flags().Bool("quote", false, "Escape and enclose each secret in double quotes")
+	injectCmd.MarkFlagsMutuallyExclusive("escape", "quote")
 }
 
 func runInject(cmd *cobra.Command, args []string) error {
@@ -46,6 +57,9 @@ func runInject(cmd *cobra.Command, args []string) error {
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		return errors.New("data from stdin is required")
 	}
+
+	escape, _ := cmd.Flags().GetBool("escape")
+	quote, _ := cmd.Flags().GetBool("quote")
 
 	// Prevent showing usage after validation
 	cmd.SilenceUsage = true
@@ -57,5 +71,5 @@ func runInject(cmd *cobra.Command, args []string) error {
 
 	b := bufio.NewWriter(os.Stdout)
 	defer b.Flush()
-	return i.Inject(cmd.Context(), os.Stdin, b)
+	return i.Inject(cmd.Context(), os.Stdin, b, escape, quote)
 }
