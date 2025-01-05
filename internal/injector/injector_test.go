@@ -161,7 +161,7 @@ secret3:baz
 
 				secret := tt.secrets[calledCount]
 				if vaultName != secret.vaultName {
-					t.Errorf("valutName = %v; want %v", vaultName, secret.vaultName)
+					t.Errorf("vaultName = %v; want %v", vaultName, secret.vaultName)
 				}
 				return client, nil
 			}).AnyTimes()
