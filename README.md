@@ -67,6 +67,10 @@ If you install using Homebrew, Homebrew will generate autocompletion scripts.
 
 ## Usage
 
+### Authentication
+
+akv uses the [DefaultAzureCredential](https://pkg.go.dev/github.com/Azure/azure-sdk-for-go/sdk/azidentity#DefaultAzureCredential) for authorization, so see its document for more details.
+
 ### inject subcommand
 
 ```console
