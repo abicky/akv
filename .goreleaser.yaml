@@ -14,7 +14,7 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X github.com/abicky/akv/cmd.revision={{.ShortCommit}}
+      - -s -X github.com/abicky/akv/cmd.revision={{.ShortCommit}}
 archives:
   - # Exclude the version to download the latest version via https://github.com/abicky/akv/releases/latest/download/$archive_name
     name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}'
