@@ -27,6 +27,7 @@ brews:
   - repository:
       owner: abicky
       name: homebrew-tools
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     homepage: "https://github.com/abicky/akv"
     description: "A CLI tool for injecting Azure Key Vault secrets"
     directory: Formula
