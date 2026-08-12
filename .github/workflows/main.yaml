@@ -19,8 +19,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - run: go install go.uber.org/mock/mockgen@latest
-
       # `go test` uses only a high-confidence subset of go vet, so execute also `go vet`
       - run: make vet
 
