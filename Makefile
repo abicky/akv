@@ -12,7 +12,7 @@ clean:
 
 .PHONY: install
 install:
-	go install -trimpath -ldflags "-s -w -X github.com/abicky/akv/cmd.revision=$(shell git rev-parse --short HEAD)"
+	go install -trimpath -ldflags "-s -X github.com/abicky/akv/cmd.revision=$(shell git rev-parse --short HEAD)"
 
 .PHONY: test
 test:
