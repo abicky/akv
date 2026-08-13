@@ -3,16 +3,24 @@ package injector_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	azfake "github.com/Azure/azure-sdk-for-go/sdk/azcore/fake"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
+	azsecretsfake "github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets/fake"
 	"github.com/abicky/akv/internal/injector"
-	"github.com/abicky/akv/testing/mock"
-	"go.uber.org/mock/gomock"
 )
 
-func TestInject(t *testing.T) {
+type clientFactoryFunc func(vaultName string) (injector.Client, error)
+
+func (f clientFactoryFunc) NewClient(vaultName string) (injector.Client, error) {
+	return f(vaultName)
+}
+
+func TestInjector_Inject(t *testing.T) {
 	type secret struct {
 		vaultName string
 		name      string
@@ -141,22 +149,57 @@ secret3:baz
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
+			calledCount := 0
+			server := azsecretsfake.Server{
+				GetSecret: func(_ context.Context, name, _ string, _ *azsecrets.GetSecretOptions) (resp azfake.Responder[azsecrets.GetSecretResponse], errResp azfake.ErrorResponder) {
+					if tt.secretErr != nil {
+						errResp.SetError(tt.secretErr)
+						return
+					}
+					if calledCount >= len(tt.secrets) {
+						t.Errorf("unexpected request")
+						errResp.SetError(errors.New("unexpected request"))
+						return
+					}
 
-			ctx := context.Background()
+					secret := tt.secrets[calledCount]
+					// The SDK passes "{secret_name}/{secret_version}" as the name argument.
+					// When the version is empty, the name therefore has a trailing "/".
+					// See: https://github.com/Azure/azure-sdk-for-go/issues/27393
+					if strings.TrimSuffix(name, "/") != secret.name {
+						t.Errorf("name = %v; want %v", name, secret.name)
+					}
+					calledCount++
 
-			factory := mock.NewMockClientFactory(ctrl)
-			client := mock.NewMockClient(ctrl)
-			i, err := injector.NewInjector(injector.InjectionModeText, factory)
+					resp.SetResponse(http.StatusOK, azsecrets.GetSecretResponse{
+						Secret: azsecrets.Secret{
+							Value: &secret.value,
+						},
+					}, nil)
+					return
+				},
+			}
+
+			// NOTE: The Azure SDK's fake Key Vault challenge requires the vault hostname to contain at least four labels.
+			// See:
+			//   https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/internal/v1.2.0/sdk/security/keyvault/internal/fake_challenge.go#L31-L33
+			//   https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/internal/v1.2.0/sdk/security/keyvault/internal/challenge_policy.go#L142-L151
+			client, err := azsecrets.NewClient("https://fake.vault.example.com", &azfake.TokenCredential{}, &azsecrets.ClientOptions{
+				ClientOptions: azcore.ClientOptions{
+					Transport: azsecretsfake.NewServerTransport(&server),
+				},
+			})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			calledCount := 0
-			factory.EXPECT().NewClient(gomock.Any()).DoAndReturn(func(vaultName string) (injector.Client, error) {
+			factory := clientFactoryFunc(func(vaultName string) (injector.Client, error) {
 				if tt.clientErr != nil {
 					return nil, tt.clientErr
+				}
+				if calledCount >= len(tt.secrets) {
+					t.Errorf("unexpected new client request")
+					return nil, errors.New("unexpected new client request")
 				}
 
 				secret := tt.secrets[calledCount]
@@ -164,28 +207,15 @@ secret3:baz
 					t.Errorf("vaultName = %v; want %v", vaultName, secret.vaultName)
 				}
 				return client, nil
-			}).AnyTimes()
+			})
 
-			client.EXPECT().GetSecret(ctx, gomock.Any(), "", nil).DoAndReturn(func(ctx context.Context, name, version string, options *azsecrets.GetSecretOptions) (azsecrets.GetSecretResponse, error) {
-				if tt.secretErr != nil {
-					return azsecrets.GetSecretResponse{}, tt.secretErr
-				}
-
-				secret := tt.secrets[calledCount]
-				if name != secret.name {
-					t.Errorf("name = %v; want %v", name, secret.name)
-				}
-				calledCount++
-
-				return azsecrets.GetSecretResponse{
-					Secret: azsecrets.Secret{
-						Value: &secret.value,
-					},
-				}, tt.secretErr
-			}).AnyTimes()
+			i, err := injector.NewInjector(injector.InjectionModeText, factory)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			var sb strings.Builder
-			err = i.Inject(ctx, strings.NewReader(tt.input), &sb, tt.escape, tt.quote)
+			err = i.Inject(t.Context(), strings.NewReader(tt.input), &sb, tt.escape, tt.quote)
 			if tt.clientErr == nil && tt.secretErr == nil {
 				if err != nil {
 					t.Errorf("err = %#v; want nil", err)
@@ -197,7 +227,10 @@ secret3:baz
 			}
 
 			if sb.String() != tt.want {
-				t.Errorf("sb.String() = %v, want %v", sb.String(), tt.want)
+				t.Errorf("sb.String() = %v; want %v", sb.String(), tt.want)
+			}
+			if tt.clientErr == nil && tt.secretErr == nil && calledCount != len(tt.secrets) {
+				t.Errorf("calledCount = %v; want %v", calledCount, len(tt.secrets))
 			}
 		})
 	}

@@ -21,6 +21,3 @@ test:
 .PHONY: vet
 vet:
 	go vet ./...
-
-mock:
-	go generate ./...
