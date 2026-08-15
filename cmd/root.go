@@ -41,5 +41,5 @@ func newInjector(mode int) (*injector.Injector, error) {
 	if err != nil {
 		return nil, err
 	}
-	return injector.NewInjector(mode, injector.NewClientFactory(cred))
+	return injector.NewInjector(mode, cred, nil)
 }
