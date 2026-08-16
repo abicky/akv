@@ -133,6 +133,15 @@ secret3:baz
 			want:      "",
 			secretErr: errors.New("error"),
 		},
+		{
+			name:      "Invalid vault name",
+			input:     "akv://example.com?/secret-name",
+			secrets:   []secret{},
+			escape:    false,
+			quote:     false,
+			want:      "akv://example.com?/secret-name",
+			secretErr: nil,
+		},
 	}
 
 	for _, tt := range tests {

@@ -16,6 +16,10 @@ import (
 const (
 	InjectionModeText = iota
 	InjectionModeValue
+
+	// Vault name and Managed HSM pool name must be a 3-24 character string, containing only 0-9, a-z, A-Z, and not consecutive -.
+	// See: https://learn.microsoft.com/en-us/azure/key-vault/general/about-keys-secrets-certificates
+	keyVaultNamePattern = "[A-Za-z0-9-]{3,24}"
 )
 
 type Injector struct {
@@ -25,7 +29,7 @@ type Injector struct {
 	re      *regexp.Regexp
 }
 
-const baseRegexp = `akv://[^/]{3,24}/[-0-9A-Za-z]{1,127}`
+const baseRegexp = `akv://` + keyVaultNamePattern + `/[-0-9A-Za-z]{1,127}`
 
 func NewInjector(mode int, cred azcore.TokenCredential, options *azsecrets.ClientOptions) (*Injector, error) {
 	var exp string
