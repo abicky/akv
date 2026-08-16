@@ -9,15 +9,20 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azfake "github.com/Azure/azure-sdk-for-go/sdk/azcore/fake"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets"
 	azsecretsfake "github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azsecrets/fake"
 	"github.com/abicky/akv/internal/injector"
 )
 
-type clientFactoryFunc func(vaultName string) (injector.Client, error)
+type validatingTransport struct {
+	next     policy.Transporter
+	validate func(*http.Request)
+}
 
-func (f clientFactoryFunc) NewClient(vaultName string) (injector.Client, error) {
-	return f(vaultName)
+func (t *validatingTransport) Do(req *http.Request) (*http.Response, error) {
+	t.validate(req)
+	return t.next.Do(req)
 }
 
 func TestInjector_Inject(t *testing.T) {
@@ -30,12 +35,10 @@ func TestInjector_Inject(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
-		vaultName string
 		secrets   []secret
 		escape    bool
 		quote     bool
 		want      string
-		clientErr error
 		secretErr error
 	}{
 		{
@@ -51,7 +54,6 @@ func TestInjector_Inject(t *testing.T) {
 			escape:    false,
 			quote:     false,
 			want:      "foo",
-			clientErr: nil,
 			secretErr: nil,
 		},
 		{
@@ -86,7 +88,6 @@ secret3:akv://vaultname3/secret-name3
 			want: `secret1: foo, secret2: bar
 secret3:baz
 "secret4": "qux"`,
-			clientErr: nil,
 			secretErr: nil,
 		},
 		{
@@ -102,7 +103,6 @@ secret3:baz
 			escape:    false,
 			quote:     true,
 			want:      `secret: "multiline\nsecret with \"quotes\""`,
-			clientErr: nil,
 			secretErr: nil,
 		},
 		{
@@ -118,17 +118,6 @@ secret3:baz
 			escape:    true,
 			quote:     false,
 			want:      `{"secret": "multiline\nsecret with \"quotes\""}`,
-			clientErr: nil,
-			secretErr: nil,
-		},
-		{
-			name:      "Client error",
-			input:     "akv://vaultname/secret-name",
-			secrets:   []secret{},
-			escape:    false,
-			quote:     false,
-			want:      "",
-			clientErr: errors.New("error"),
 			secretErr: nil,
 		},
 		{
@@ -142,8 +131,16 @@ secret3:baz
 			escape:    false,
 			quote:     false,
 			want:      "",
-			clientErr: nil,
 			secretErr: errors.New("error"),
+		},
+		{
+			name:      "Invalid vault name",
+			input:     "akv://example.com?/secret-name",
+			secrets:   []secret{},
+			escape:    false,
+			quote:     false,
+			want:      "akv://example.com?/secret-name",
+			secretErr: nil,
 		},
 	}
 
@@ -180,43 +177,32 @@ secret3:baz
 				},
 			}
 
-			// NOTE: The Azure SDK's fake Key Vault challenge requires the vault hostname to contain at least four labels.
-			// See:
-			//   https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/internal/v1.2.0/sdk/security/keyvault/internal/fake_challenge.go#L31-L33
-			//   https://github.com/Azure/azure-sdk-for-go/blob/sdk/security/keyvault/internal/v1.2.0/sdk/security/keyvault/internal/challenge_policy.go#L142-L151
-			client, err := azsecrets.NewClient("https://fake.vault.example.com", &azfake.TokenCredential{}, &azsecrets.ClientOptions{
+			transport := &validatingTransport{
+				next: azsecretsfake.NewServerTransport(&server),
+				validate: func(req *http.Request) {
+					if calledCount >= len(tt.secrets) {
+						t.Errorf("unexpected request to %q", req.URL.Host)
+						return
+					}
+
+					want := tt.secrets[calledCount].vaultName + ".vault.azure.net"
+					if req.URL.Host != want {
+						t.Errorf("request host = %q; want %q", req.URL.Host, want)
+					}
+				},
+			}
+			i, err := injector.NewInjector(injector.InjectionModeText, &azfake.TokenCredential{}, &azsecrets.ClientOptions{
 				ClientOptions: azcore.ClientOptions{
-					Transport: azsecretsfake.NewServerTransport(&server),
+					Transport: transport,
 				},
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			factory := clientFactoryFunc(func(vaultName string) (injector.Client, error) {
-				if tt.clientErr != nil {
-					return nil, tt.clientErr
-				}
-				if calledCount >= len(tt.secrets) {
-					t.Errorf("unexpected new client request")
-					return nil, errors.New("unexpected new client request")
-				}
-
-				secret := tt.secrets[calledCount]
-				if vaultName != secret.vaultName {
-					t.Errorf("vaultName = %v; want %v", vaultName, secret.vaultName)
-				}
-				return client, nil
-			})
-
-			i, err := injector.NewInjector(injector.InjectionModeText, factory)
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			var sb strings.Builder
 			err = i.Inject(t.Context(), strings.NewReader(tt.input), &sb, tt.escape, tt.quote)
-			if tt.clientErr == nil && tt.secretErr == nil {
+			if tt.secretErr == nil {
 				if err != nil {
 					t.Errorf("err = %#v; want nil", err)
 				}
@@ -229,7 +215,7 @@ secret3:baz
 			if sb.String() != tt.want {
 				t.Errorf("sb.String() = %v; want %v", sb.String(), tt.want)
 			}
-			if tt.clientErr == nil && tt.secretErr == nil && calledCount != len(tt.secrets) {
+			if tt.secretErr == nil && calledCount != len(tt.secrets) {
 				t.Errorf("calledCount = %v; want %v", calledCount, len(tt.secrets))
 			}
 		})
